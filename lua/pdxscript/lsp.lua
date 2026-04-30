@@ -29,6 +29,19 @@ local function find_mod_root(path)
   return nil, nil
 end
 
+-- Set up highlight groups once at startup and re-apply on colorscheme changes.
+local _hl_setup_done = false
+local function ensure_highlights()
+  if _hl_setup_done then return end
+  _hl_setup_done = true
+  require("pdxscript").setup_highlights()
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    pattern = "*",
+    callback = function() require("pdxscript").setup_highlights() end,
+    desc = "Re-apply pdxscript highlight groups after colorscheme change",
+  })
+end
+
 -- Start (or reuse) the LSP for `bufnr`. Called from ftplugin/pdxscript.lua.
 function M.maybe_start(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
@@ -68,6 +81,7 @@ function M.maybe_start(bufnr)
     single_file_support = false,
     settings = server.settings or {},
     on_attach = function(client, buf)
+      ensure_highlights()
       -- Explicitly start semantic token highlighting (required for vim.lsp.start clients).
       if client.server_capabilities.semanticTokensProvider then
         vim.lsp.semantic_tokens.start(buf, client.id)

@@ -129,8 +129,8 @@ local function line_brace_counts(line)
   return opens, closes
 end
 
---- Returns a list of {icon, key} pairs from outermost to innermost enclosing block,
---- or nil if at top level. Each entry has .icon (string) and .key (string).
+--- Returns a list of {icon, key, hl} triples from outermost to innermost enclosing block,
+--- or nil if at top level. .hl is the highlight group name for the icon.
 function M.get_scope_parts()
   local bufnr = vim.api.nvim_get_current_buf()
   if vim.bo[bufnr].filetype ~= "pdxscript" then return nil end
@@ -151,7 +151,7 @@ function M.get_scope_parts()
       if depth < 0 then
         local key = line:match("^%s*([%w_.:]+)%s*[<>!?]*=%s*{")
                  or line:match("^%s*([%w_.:]+)%s*{")
-        if key then table.insert(parts, 1, { icon = scope_icon(key), key = key }) end
+        if key then table.insert(parts, 1, { icon = scope_icon(key), key = key, hl = M.icon_hl(key) }) end
         depth = 0
       end
     end
@@ -169,6 +169,73 @@ function M.get_scope()
     table.insert(segs, p.key)
   end
   return table.concat(segs, " > ")
+end
+
+-- ─── HIGHLIGHT GROUPS ────────────────────────────────────────────────────────
+
+-- Highlight groups for pdxscript icons in the statusline breadcrumb.
+-- Link to existing semantic/treesitter groups so the colorscheme drives the palette.
+local ICON_HLS = {
+  PdxIconTrigger     = { link = "DiagnosticWarn" },       -- 󱐋  orange/yellow
+  PdxIconEffect      = { link = "Function" },             -- 󱐌  blue/purple
+  PdxIconOption      = { link = "String" },               -- 󰒓  green
+  PdxIconLimit       = { link = "@keyword.conditional" }, -- 󰈲  keyword color
+  PdxIconConditional = { link = "@keyword.conditional" }, -- 󱉴  if/else
+  PdxIconLogic       = { link = "Operator" },             -- ∧∨¬
+  PdxIconModifier    = { link = "@type" },                -- 󰆦  type color
+  PdxIconIterator    = { link = "@keyword.repeat" },      -- 󰔱  loop color
+  PdxIconEvent       = { link = "Special" },              -- 󰉁  special color
+  PdxIconBlock       = { link = "Comment" },              -- 󰅩  neutral/dim
+}
+
+-- Map scope keys to their highlight group name.
+local ICON_HL_MAP = {
+  trigger         = "PdxIconTrigger",
+  trigger_if      = "PdxIconTrigger",
+  trigger_else    = "PdxIconTrigger",
+  trigger_else_if = "PdxIconTrigger",
+  effect          = "PdxIconEffect",
+  immediate       = "PdxIconEffect",
+  after           = "PdxIconEffect",
+  on_accept       = "PdxIconEffect",
+  on_decline      = "PdxIconEffect",
+  on_pass         = "PdxIconEffect",
+  on_fail         = "PdxIconEffect",
+  option          = "PdxIconOption",
+  limit           = "PdxIconLimit",
+  switch          = "PdxIconConditional",
+  ["if"]          = "PdxIconConditional",
+  else_if         = "PdxIconConditional",
+  ["else"]        = "PdxIconConditional",
+  AND             = "PdxIconLogic",
+  OR              = "PdxIconLogic",
+  NOT             = "PdxIconLogic",
+  NOR             = "PdxIconLogic",
+  NAND            = "PdxIconLogic",
+  modifier        = "PdxIconModifier",
+  on_action       = "PdxIconEvent",
+}
+
+--- Define all pdxscript highlight groups. Safe to call multiple times (idempotent).
+--- Call once on startup and re-call on ColorScheme to survive theme reloads.
+function M.setup_highlights()
+  for name, def in pairs(ICON_HLS) do
+    vim.api.nvim_set_hl(0, name, def)
+  end
+  -- Semantic token overrides for pdxscript filetype:
+  -- Ensure prefix:value coloring works even if catppuccin doesn't set these.
+  vim.api.nvim_set_hl(0, "@lsp.type.namespace.pdxscript",   { link = "@namespace" })
+  vim.api.nvim_set_hl(0, "@lsp.type.enumMember.pdxscript",  { link = "@constant" })
+end
+
+--- Return the highlight group name for a scope key (or a default).
+function M.icon_hl(key)
+  if ICON_HL_MAP[key] then return ICON_HL_MAP[key] end
+  if key:find("%.") then return "PdxIconEvent" end
+  if key:match("^every_") or key:match("^any_") or key:match("^random_") or key:match("^ordered_") then
+    return "PdxIconIterator"
+  end
+  return "PdxIconBlock"
 end
 
 -- ─── MODELINE ────────────────────────────────────────────────────────────────
