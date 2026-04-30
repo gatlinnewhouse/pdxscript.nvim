@@ -68,8 +68,10 @@ function M.maybe_start(bufnr)
     single_file_support = false,
     settings = server.settings or {},
     on_attach = function(client, buf)
-      -- Disable hover — tiger-lib doesn't implement it.
-      client.server_capabilities.hoverProvider = false
+      -- Explicitly start semantic token highlighting (required for vim.lsp.start clients).
+      if client.server_capabilities.semanticTokensProvider then
+        vim.lsp.semantic_tokens.start(buf, client.id)
+      end
       if server.on_attach then
         server.on_attach(client, buf)
       end
