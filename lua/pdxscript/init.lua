@@ -60,8 +60,57 @@ end
 
 -- ─── SCOPE BREADCRUMB ────────────────────────────────────────────────────────
 
+-- Icons for known pdxscript block keywords (Nerd Font required).
+local SCOPE_ICONS = {
+  -- Trigger/condition blocks
+  trigger          = "󱐋",
+  trigger_if       = "󱐋",
+  trigger_else     = "󱐋",
+  trigger_else_if  = "󱐋",
+  -- Effect blocks
+  effect           = "󱐌",
+  immediate        = "󱐌",
+  after            = "󱐌",
+  on_accept        = "󱐌",
+  on_decline       = "󱐌",
+  on_pass          = "󱐌",
+  on_fail          = "󱐌",
+  -- Flow control
+  option           = "󰒓",
+  limit            = "󰈲",
+  switch           = "󰔡",
+  -- Conditionals
+  ["if"]           = "󱉴",
+  else_if          = "󱉴",
+  ["else"]         = "󱉴",
+  -- Logic
+  AND              = "∧",
+  OR               = "∨",
+  NOT              = "¬",
+  NOR              = "¬∨",
+  NAND             = "¬∧",
+  -- Named blocks
+  modifier         = "󰆦",
+  on_action        = "󰗀",
+  -- Generic containers
+  scripted_effect  = "󰊕",
+  scripted_trigger = "󱐋",
+}
+
+-- Return the icon for a scope key, or a default block icon if unknown.
+local function scope_icon(key)
+  if SCOPE_ICONS[key] then return SCOPE_ICONS[key] end
+  -- Event ids contain a dot (namespace.event_id)
+  if key:find("%.") then return "󰉁" end
+  -- Iterators: every_*, any_*, random_*, ordered_*
+  if key:match("^every_") or key:match("^any_") or key:match("^random_") or key:match("^ordered_") then
+    return "󰔱"
+  end
+  return "󰅩"  -- generic block
+end
+
 -- Walk upward from the cursor counting braces to find enclosing `key = {` scopes.
--- Returns a string like "some_event > option > trigger", or nil if at top level.
+-- Returns a list of {icon, name} pairs from outermost to innermost, or nil if at top level.
 -- Called on every statusline refresh so kept O(lines_above_cursor).
 local function line_brace_counts(line)
   local opens, closes = 0, 0
@@ -80,7 +129,9 @@ local function line_brace_counts(line)
   return opens, closes
 end
 
-function M.get_scope()
+--- Returns a list of {icon, key} pairs from outermost to innermost enclosing block,
+--- or nil if at top level. Each entry has .icon (string) and .key (string).
+function M.get_scope_parts()
   local bufnr = vim.api.nvim_get_current_buf()
   if vim.bo[bufnr].filetype ~= "pdxscript" then return nil end
 
@@ -88,29 +139,36 @@ function M.get_scope()
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, cursor_line, false)
 
   local depth = 0
-  local scopes = {}
+  local parts = {}
 
   for i = #lines, 1, -1 do
     local line = lines[i]
     local opens, closes = line_brace_counts(line)
 
-    -- Going upward: closing braces increase the "unmatched sub-block" count;
-    -- opening braces decrease it. When depth goes negative an opener encloses us.
     depth = depth + closes
     for _ = 1, opens do
       depth = depth - 1
       if depth < 0 then
-        -- This `{` encloses the cursor. Extract the key before `=` or directly before `{`.
         local key = line:match("^%s*([%w_.:]+)%s*[<>!?]*=%s*{")
                  or line:match("^%s*([%w_.:]+)%s*{")
-        if key then table.insert(scopes, 1, key) end
+        if key then table.insert(parts, 1, { icon = scope_icon(key), key = key }) end
         depth = 0
       end
     end
   end
 
-  if #scopes == 0 then return nil end
-  return table.concat(scopes, " > ")
+  return #parts > 0 and parts or nil
+end
+
+--- Returns a plain " > "-separated scope string (backward-compatible).
+function M.get_scope()
+  local parts = M.get_scope_parts()
+  if not parts then return nil end
+  local segs = {}
+  for _, p in ipairs(parts) do
+    table.insert(segs, p.key)
+  end
+  return table.concat(segs, " > ")
 end
 
 -- ─── MODELINE ────────────────────────────────────────────────────────────────
