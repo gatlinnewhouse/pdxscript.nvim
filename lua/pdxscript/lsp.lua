@@ -76,6 +76,7 @@ function M.maybe_start(bufnr)
   vim.lsp.start({
     name = "pdxscript-lsp",
     cmd  = { cmd },
+    cmd_env = server.cmd_env or {},
     root_dir = mod_root,
     filetypes = { "pdxscript" },
     single_file_support = false,

@@ -13,6 +13,9 @@ local defaults = {
     -- Called after LSP attaches. Receives (client, bufnr).
     on_attach = nil,
     settings = {},
+    -- Extra environment variables passed to the LSP server process.
+    -- e.g. { RUST_BACKTRACE = "1" }
+    cmd_env = {},
   },
 }
 
