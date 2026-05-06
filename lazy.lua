@@ -20,94 +20,98 @@
 --   }
 
 return {
-  recommended = function()
-    return LazyVim.extras.wants({
-      ft = "pdxscript",
-      root = {
-        "vic3-tiger.conf",
-        "ck3-tiger.conf",
-        "imperator-tiger.conf",
-        "hoi4-tiger.conf",
-        "eu5-tiger.conf",
-      },
-    })
-  end,
+	recommended = function()
+		return LazyVim.extras.wants({
+			ft = "pdxscript",
+			root = {
+				"vic3-tiger.conf",
+				"ck3-tiger.conf",
+				"imperator-tiger.conf",
+				"hoi4-tiger.conf",
+				"eu5-tiger.conf",
+			},
+		})
+	end,
 
-  -- Core plugin — owns LSP startup via ftplugin/pdxscript.lua.
-  -- No lspconfig dependency. LSP server is selected per-mod by *-tiger.conf detection.
-  {
-    "paradox-modding/pdxscript.nvim", -- replace with actual GitHub path when published
-    lazy = false,
-    config = function(_, opts)
-      vim.g.pdxscriptvim = vim.tbl_deep_extend("keep", vim.g.pdxscriptvim or {}, opts or {})
-    end,
-  },
+	-- Core plugin — owns LSP startup via ftplugin/pdxscript.lua.
+	-- No lspconfig dependency. LSP server is selected per-mod by *-tiger.conf detection.
+	{
+		"paradox-modding/pdxscript.nvim", -- replace with actual GitHub path when published
+		lazy = false,
+		config = function(_, opts)
+			vim.g.pdxscriptvim = vim.tbl_deep_extend("keep", vim.g.pdxscriptvim or {}, opts or {})
+		end,
+	},
 
-  -- Treesitter syntax: registers the paradox parser for pdxscript buffers.
-  -- Run :TSInstall paradox after :Lazy sync.
-  {
-    "nvim-treesitter/nvim-treesitter",
-    dependencies = {
-      { "Acture/tree-sitter-paradox", build = false },
-    },
-    opts = function(_, opts)
-      local ok, parsers = pcall(require, "nvim-treesitter.parsers")
-      if ok then
-        local tbl = type(parsers.get_parser_configs) == "function"
-          and parsers.get_parser_configs()
-          or parsers
-        tbl["paradox"] = {
-          install_info = {
-            url = vim.fn.stdpath("data") .. "/lazy/tree-sitter-paradox",
-            files = { "src/parser.c" },
-          },
-        }
-      end
-      vim.treesitter.language.register("paradox", "pdxscript")
-      return opts
-    end,
-  },
+	-- Treesitter syntax: registers the paradox parser for pdxscript buffers.
+	-- Run :TSInstall paradox after :Lazy sync.
+	{
+		"nvim-treesitter/nvim-treesitter",
+		dependencies = {
+			{ "Acture/tree-sitter-paradox", build = false },
+		},
+		opts = function(_, opts)
+			local ok, parsers = pcall(require, "nvim-treesitter.parsers")
+			if ok then
+				local tbl = type(parsers.get_parser_configs) == "function" and parsers.get_parser_configs() or parsers
+				tbl["paradox"] = {
+					install_info = {
+						url = vim.fn.stdpath("data") .. "/lazy/tree-sitter-paradox",
+						files = { "src/parser.c" },
+					},
+				}
+			end
+			vim.treesitter.language.register("paradox", "pdxscript")
+			return opts
+		end,
+	},
 
-  -- Filetype icon for lualine / nvim-web-devicons.
-  {
-    "nvim-mini/mini.icons",
-    optional = true,
-    opts = function(_, opts)
-      opts.filetype = opts.filetype or {}
-      opts.filetype["pdxscript"] = { glyph = "󰏗", hl = "MiniIconsYellow" }
-    end,
-  },
+	-- Filetype icon for lualine / nvim-web-devicons.
+	{
+		"nvim-mini/mini.icons",
+		optional = true,
+		opts = function(_, opts)
+			opts.filetype = opts.filetype or {}
+			opts.filetype["pdxscript"] = { glyph = "󰏗", hl = "MiniIconsYellow" }
+		end,
+	},
 
-  -- Statusline: append pdx scope breadcrumb to lualine_c.
-  -- Does NOT replace LazyVim's existing lualine_c components (root_dir, diagnostics, path).
-  {
-    "nvim-lualine/lualine.nvim",
-    optional = true,
-    opts = function(_, opts)
-      local pdx_scope = {
-        function()
-          local scope = require("pdxscript").get_scope()
-          if not scope then return "" end
-          local parts = {}
-          for seg in scope:gmatch("[^>]+") do
-            local trimmed = vim.trim(seg)
-            if #trimmed > 24 then trimmed = trimmed:sub(1, 21) .. "…" end
-            table.insert(parts, trimmed)
-          end
-          -- Show at most 3 levels to keep the statusline from overflowing.
-          if #parts > 3 then
-            parts = { "…", parts[#parts - 1], parts[#parts] }
-          end
-          return " 󰊕 " .. table.concat(parts, " > ")
-        end,
-        cond = function() return vim.bo.filetype == "pdxscript" end,
-        padding = { left = 0, right = 1 },
-      }
+	-- Statusline: append pdx scope breadcrumb to lualine_c.
+	-- Does NOT replace LazyVim's existing lualine_c components (root_dir, diagnostics, path).
+	{
+		"nvim-lualine/lualine.nvim",
+		optional = true,
+		opts = function(_, opts)
+			local pdx_scope = {
+				function()
+					local scope = require("pdxscript").get_scope()
+					if not scope then
+						return ""
+					end
+					local parts = {}
+					for seg in scope:gmatch("[^>]+") do
+						local trimmed = vim.trim(seg)
+						if #trimmed > 24 then
+							trimmed = trimmed:sub(1, 21) .. "…"
+						end
+						table.insert(parts, trimmed)
+					end
+					-- Show at most 3 levels to keep the statusline from overflowing.
+					if #parts > 3 then
+						parts = { "…", parts[#parts - 1], parts[#parts] }
+					end
+					return " 󰊕 " .. table.concat(parts, " > ")
+				end,
+				cond = function()
+					return vim.bo.filetype == "pdxscript"
+				end,
+				padding = { left = 0, right = 1 },
+			}
 
-      opts.sections = opts.sections or {}
-      opts.sections.lualine_c = opts.sections.lualine_c or {}
-      table.insert(opts.sections.lualine_c, pdx_scope)
-      return opts
-    end,
-  },
+			opts.sections = opts.sections or {}
+			opts.sections.lualine_c = opts.sections.lualine_c or {}
+			table.insert(opts.sections.lualine_c, pdx_scope)
+			return opts
+		end,
+	},
 }
